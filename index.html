@@ -34,6 +34,8 @@ textarea.cd{font-family:ui-monospace,Menlo,monospace;font-size:13px;min-height:1
 .tr{display:flex;gap:6px;align-items:baseline;width:100%;text-align:left;background:transparent;color:var(--tx);border:0;border-radius:8px;padding:6px 6px;min-height:36px;font-weight:500;font-size:13.5px}
 .tr.on{background:#1a2b3c}.tr .kd{flex:0 0 auto;font-size:11px;padding:0 7px;border-radius:99px;border:1px solid var(--line);color:var(--mu)}
 .tr .rg{color:var(--mu);font-size:12px;flex:0 0 auto}.flow{display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin:6px 0}.flow span.ar{color:var(--mu)}
+b.tk{color:#ff9d6c}b.tf{color:#7ad7ff}b.ts{color:#9fe3a1}b.tn{color:#e6c07b}b.tv{color:#d6a5ff}b.tc{color:#6b7f95}b.th{color:#56677a}.cl b{font-weight:400}
+.cl.sel{outline:1px solid var(--ac);outline-offset:-1px}.cl{cursor:pointer}.cl>span>div{white-space:pre}.gs{white-space:normal!important;color:var(--bl);font:11.5px/1.45 -apple-system,system-ui,sans-serif;max-width:min(78vw,420px);padding:1px 0 3px}
 dl.fl{margin:8px 0}dl.fl dt{font-size:12px;color:var(--ac);font-weight:700;margin-top:8px}dl.fl dd{margin:2px 0 0}dl.fl ul{margin:2px 0 2px 18px}
 .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 button{font:inherit;background:var(--ac);color:#241a00;border:0;border-radius:10px;padding:9px 13px;font-weight:700;min-height:44px}
@@ -145,18 +147,18 @@ const FEAT=[
  [/\.(filter|map|reduce)\s*\(/,'配列の絞り込み・変換','f7'],[/\?\.|\?\?/,'無い値を安全に扱う（?. ??）','k8'],[/=>/,'アロー関数（=>）','k6'],[/\$\{/,'文字に値を埋め込む（${ }）','k10'],
  [/\bnavigator\.clipboard\b/,'コピー','u2'],[/\bspeechSynthesis\b/,'読み上げ','v1'],[/\$env:|Get-ChildItem|Set-Location|\bgit\s/,'PowerShell・git の操作','p1']];
 function parseCode(src){
-  let L=String(src).replace(/\r\n?/g,'\n');
+  let L=String(src).replace(/\r\n?/g,'\n');const L0=L,out=[];
   if(/<script[\s>]/i.test(L)){const o=[];let pos=0;const rx=/<script[^>]*>([\s\S]*?)<\/script>/gi;let m;
-    while((m=rx.exec(L))){const a=m.index+m[0].indexOf('>')+1;o.push(L.slice(pos,a).replace(/[^\n]/g,' '),m[1]);pos=a+m[1].length}
-    o.push(L.slice(pos).replace(/[^\n]/g,' '));L=o.join('')}
+    while((m=rx.exec(L))){const a=m.index+m[0].indexOf('>')+1;out.push([pos,a]);o.push(L.slice(pos,a).replace(/[^\n]/g,' '),m[1]);pos=a+m[1].length}
+    out.push([pos,L.length]);o.push(L.slice(pos).replace(/[^\n]/g,' '));L=o.join('')}
   const n=L.length,ps=!/\bconst\b|\blet\b|=>/.test(L)&&/(^|\n)\s*(function\s+[\w-]+\s*\{|\$\w+\s*=|param\s*\()/.test(L);
-  const clean=L.split('');let i=0,line=1,hs=0,pd=0,ph='';const st=[],blocks=[],errs=[];
+  const cls=new Uint8Array(n);out.forEach(r=>{for(let k=r[0];k<r[1];k++)cls[k]=3});const clean=L.split('');let i=0,line=1,hs=0,pd=0,ph='';const st=[],blocks=[],errs=[];
   const blank=(a,b)=>{for(let k=a;k<b;k++)if(clean[k]!=='\n')clean[k]=' '};
   const skipBr=(k)=>{let d=1;k+=2;while(k<n&&d>0){if(L[k]==='{')d++;else if(L[k]==='}')d--;else if(L[k]==='\n')line++;k++}return k};
   while(i<n){const c=L[i],d=L[i+1];
     if(c==='\n'){line++;if(ps&&pd===0){const t=clean.slice(hs,i).join('').trim();if(t)ph=t;hs=i+1}i++;continue}
-    if((c==='/'&&d==='/')||(ps&&c==='#')){const e=L.indexOf('\n',i);const j=e<0?n:e;blank(i,j);i=j;continue}
-    if(c==='/'&&d==='*'||(ps&&c==='<'&&d==='#')){const cl=ps&&c==='<'?'#>':'*/';let e=L.indexOf(cl,i+2);e=e<0?n:e+2;for(let k=i;k<e;k++)if(L[k]==='\n')line++;blank(i,e);i=e;continue}
+    if((c==='/'&&d==='/')||(ps&&c==='#')){const e=L.indexOf('\n',i);const j=e<0?n:e;for(let q=i;q<j;q++)cls[q]=1;blank(i,j);i=j;continue}
+    if(c==='/'&&d==='*'||(ps&&c==='<'&&d==='#')){const cl=ps&&c==='<'?'#>':'*/';let e=L.indexOf(cl,i+2);e=e<0?n:e+2;for(let k=i;k<e;k++){if(L[k]==='\n')line++;cls[k]=1}blank(i,e);i=e;continue}
     if(c==='"'||c==="'"||c==='`'){let k=i+1;
       while(k<n){const x=L[k];
         if(x==='\n'){line++;if(c!=='`'&&!ps&&L[k-1]!=='\\')break}
@@ -165,7 +167,7 @@ function parseCode(src){
         else if(ps&&x==='`'&&c==='"'){k++}
         else if(x===c){if(ps&&L[k+1]===c){k++}else break}
         k++}
-      blank(i+1,Math.min(k,n));i=Math.min(k,n)+1;continue}
+      for(let q=i;q<=Math.min(k,n-1);q++)cls[q]=2;blank(i+1,Math.min(k,n));i=Math.min(k,n)+1;continue}
     if(c==='('){pd++}else if(c===')'){pd=Math.max(0,pd-1)}
     else if(c===';'&&pd===0){hs=i+1;ph=''}
     else if(c==='{'){{let hd=clean.slice(hs,i).join('');if(ps&&!hd.trim()&&ph)hd=ph;st.push({line,idx:i,head:hd,depth:st.length});ph='';hs=i+1}}
@@ -174,7 +176,7 @@ function parseCode(src){
   st.forEach(t=>errs.push('行'+t.line+'：開いた { が閉じられていません'));
   blocks.sort((a,b)=>a.start-b.start||b.end-a.end);
   const feats=FEAT.filter(f=>f[0].test(clean.join(''))).map(f=>({t:f[1],id:f[2]}));
-  return{blocks,errs,lines:L.split('\n').length,feats}}
+  return{blocks,errs,lines:L.split('\n').length,feats,src:L0,cls,ps}}
 function classify(head,ps){
   const h=head.replace(/\s+/g,' ').trim(); let m;
   if((m=/(?:^|[\s=:(,])function\b\s*\*?\s*([\w$-]*)/.exec(h)))return{kind:'関数',name:m[1]||'（名前なし）'};
@@ -190,7 +192,93 @@ function classify(head,ps){
   if((m=/^(?:async\s+)?([\w$]+)\s*\([^()]*\)$/.exec(h))&&!/^(if|for|while|switch|catch|function|return)$/.test(m[1]))return{kind:'メソッド',name:m[1]};
   if(/(=|:|\(|,|@|\breturn|\[)\s*$/.test(h)||h==='')return{kind:'データ',name:h?h.replace(/[=:(,\[]\s*$/,'').trim().slice(0,30):''};
   return{kind:'ブロック',name:h.slice(0,30)}}
-const R={src:'',res:null,sel:-1};
+// ---- Phase 5：色分け・行の解説・1行の分解 ----
+const KWS=new Set(['async','await','function','const','let','var','return','if','else','for','while','do','switch','case','break','continue','try','catch','finally','throw','new','class','import','export','default','typeof','of','in','null','undefined','true','false','this','yield']);
+const KWP=new Set(['function','param','foreach','if','elseif','else','return','switch','try','catch','finally','throw','while','for','break','continue','in']);
+function hlLine(t,cl,off,ps){
+  let o='',i=0;const n=t.length,sp=(c,s)=>`<b class="${c}">${esc(s)}</b>`;
+  while(i<n){const k=cl[off+i];
+    if(k){let j=i;while(j<n&&cl[off+j]===k)j++;o+=sp(k===1?'tc':k===2?'ts':'th',t.slice(i,j));i=j;continue}
+    const r=t.slice(i);let m;
+    if(ps&&(m=/^\$[\w:]+/.exec(r))){o+=sp('tv',m[0]);i+=m[0].length;continue}
+    if((m=/^[A-Za-z_$][\w$]*(?:-[A-Za-z][\w]*)*/.exec(r))){let w=m[0];if(!ps&&w.includes('-')){w=/^[\w$]+/.exec(w)[0]}
+      const nx=t.slice(i+w.length).match(/^\s*(.)/);const lw=w.toLowerCase();
+      if((ps?KWP:KWS).has(ps?lw:w))o+=sp('tk',w);else if(nx&&nx[1]==='('||(ps&&/^[A-Z][a-z]+-[A-Z]/.test(w)))o+=sp('tf',w);else o+=esc(w);
+      i+=w.length;continue}
+    if((m=/^\d+(?:\.\d+)?/.exec(r))){o+=sp('tn',m[0]);i+=m[0].length;continue}
+    o+=esc(t[i]);i++}
+  return o||' '}
+function bal(s,i){let d=0;for(let k=i;k<s.length;k++){if(s[k]==='(')d++;else if(s[k]===')'){d--;if(d===0)return[s.slice(i+1,k),s.slice(k+1).trim()]}}return[s.slice(i+1),'']}
+function lineGist(t,n,b,ps){
+  const s=t.trim();if(!s||/^(\/\/|\/\*|\*|#|<!--)/.test(s))return'';let m;const cut=(x,k)=>{x=String(x).trim();return x.length>(k||36)?x.slice(0,k||36)+'…':x};
+  if(/^[}\])][\s;,)\]})]*$/.test(s)||/^\}\s*(else|catch|finally|elseif)\b/i.test(s)){
+    if(/^\}\s*else\s+if|^\}\s*elseif/i.test(s))return'ひとつ前の条件が合わない時、次の条件を調べる';
+    if(/^\}\s*else\b/i.test(s))return'どの条件も合わない時';
+    if(/^\}\s*catch/i.test(s))return'失敗した時の受け皿（エラーが入る）';
+    if(/^\}\s*finally/i.test(s))return'成功しても失敗しても最後に行う';
+    const xs=b.filter(z=>z.end===n).sort((a,c)=>c.start-a.start);const x=xs[0];return x?`「${x.kind}${x.name?'：'+cut(x.name,24):''}」（行${x.start}〜）の終わり`:'範囲の終わり'}
+  if(ps){
+    if((m=/^function\s+([\w-]+)/i.exec(s)))return`関数 ${m[1]} を定義`;
+    if(/^param\s*\(/i.test(s))return'受け取る材料（引数）を宣言';
+    if((m=/^foreach\s*\(\s*\$(\w+)\s+in\s+(.+?)\)/i.exec(s)))return`${cut(m[2])} の1つずつを $${m[1]} として繰り返す`;
+    if((m=/^(?:\}\s*)?(?:else)?if\s*\(/i.exec(s))){const q=bal(s,m[0].length-1);return`もし ${cut(q[0])} なら`}
+    if(/^return\b/i.test(s))return'値を返して、関数を終える';
+    if((m=/^\$([\w:]+)\s*=\s*(.+)$/.exec(s)))return`$${m[1]} に ${cut(m[2])} を入れる`;
+    if(/^Write-Host/i.test(s))return'画面に表示する';
+    if(/^(Set-Location|cd)\b/i.test(s))return'フォルダを移動する';
+    if(/^Copy-Item/i.test(s))return'ファイルをコピーする';
+    if(/^New-Item/i.test(s))return'ファイルやフォルダを作る';
+    if((m=/^git\s+(\w+)/i.exec(s))){const G={add:'次の記録に入れる',commit:'変更を履歴に記録する',push:'GitHub に送る',pull:'GitHub から取り込む',init:'git の管理を始める',fetch:'GitHub の最新を取ってくる（反映はしない）',checkout:'切り替える・戻す',branch:'ブランチ（流れ）を扱う',diff:'違いを見る',reset:'位置を戻す',remote:'送り先を扱う',status:'状態を見る',log:'履歴を見る'};return`git ${m[1]}：${G[m[1]]||'git の操作'}`}
+    if((m=/^gh\s+(\w+)/i.exec(s)))return`GitHub のコマンド（gh ${m[1]}）`;
+    return''}
+  if((m=/^(?:export\s+)?(async\s+)?function\s*\*?\s*([\w$]*)\s*\(([^)]*)\)/.exec(s)))return`${m[1]?'非同期の':''}関数 ${m[2]||'（名前なし）'} を定義${m[3].trim()?'（引数：'+cut(m[3],24)+'）':''}`;
+  if((m=/^(?:const|let|var)\s+([\w$]+)\s*=\s*(async\s*)?(?:\(([^)]*)\)|[\w$]+)\s*=>/.exec(s)))return`${m[1]} という名前で、${m[2]?'非同期の':''}アロー関数を定義`;
+  if((m=/^(?:const|let|var)\s+([\w$]+)\s*=\s*await\s+fetch\s*\(/.exec(s)))return`${m[1]} に、fetch（通信）の返事を、来るまで待って入れる`;
+  if((m=/^(?:const|let|var)\s+([\w$]+)\s*=\s*await\s+([\w$.]+)\.json\(\)/.exec(s)))return`${m[1]} に、${m[2]} の本文を JSON（データ）として読んで入れる`;
+  if((m=/^(?:const|let|var)\s+([\w$]+)\s*=\s*await\s+(.+?);?$/.exec(s)))return`${m[1]} に、${cut(m[2])} の結果を待って入れる`;
+  if((m=/^(?:const|let|var)\s+\{([^}]*)\}\s*=\s*(.+?);?$/.exec(s)))return`${cut(m[2])} の中から ${cut(m[1],24)} を取り出す`;
+  if((m=/^(const|let|var)\s+([\w$]+)\s*=\s*(.+?);?$/.exec(s))){const r=m[3];const w=m[1]==='const'?'あとで入れ替えない':'入れ替えられる';
+    if(/^\[/.test(r))return`${m[2]} に配列（リスト）を入れる（${w}）`;if(/^\{/.test(r))return`${m[2]} にオブジェクト（項目のまとまり）を入れる（${w}）`;return`${m[2]} に ${cut(r)} を入れる（${w}）`}
+  if((m=/^(?:\}\s*)?(?:else\s+)?if\s*\(/.exec(s))){const q=bal(s,m[0].length-1),r=q[1].replace(/^\{\s*/,'');return`もし ${cut(q[0])} なら`+(r?'：'+cut(r,24):'')}
+  if((m=/^for\s*\(\s*(?:const|let|var)\s+([\w$]+)\s+of\s+(.+?)\)/.exec(s)))return`${cut(m[2])} の1つずつを ${m[1]} として繰り返す`;
+  if(/^for\s*\(/.test(s))return'条件が続く間、くり返す';
+  if(/^while\s*\(/.test(s))return'条件が続く間、くり返す';
+  if(/^try\s*\{?$/.test(s))return'失敗するかもしれない処理を試す';
+  if((m=/^return\b\s*(.*?);?$/.exec(s)))return m[1]?`${cut(m[1])} を返して、関数を終える`:'ここで関数を終える';
+  if(/^throw\b/.test(s))return'エラーを起こして処理を止める';
+  if((m=/^await\s+(.+?);?$/.exec(s)))return`${cut(m[1])} が終わるまで待つ`;
+  if((m=/([\w$.]+)\.addEventListener\(\s*['"](\w+)['"]/.exec(s)))return`${m[1]} で「${m[2]}」が起きたら、中の処理を実行する`;
+  if((m=/\.on(\w+)\s*=/.exec(s)))return`「${m[1]}」が起きた時の処理を登録`;
+  if(/localStorage\.setItem/.test(s))return'端末に保存する';
+  if(/localStorage\.getItem/.test(s))return'端末から読み出す';
+  if(/^console\.log/.test(s))return'画面の裏（コンソール）に表示する（確認用）';
+  if((m=/^([\w$.]+)\.(forEach|map|filter|reduce)\(/.exec(s)))return`${m[1]} の1つずつに処理をする（${m[2]}）`;
+  if((m=/^([\w$.\[\]'"]+)\s*=\s*(.+?);?$/.exec(s)))return`${cut(m[1],24)} に ${cut(m[2])} を入れる`;
+  if((m=/^([\w$.]+)\s*\(/.exec(s)))return`${m[1]} を実行する`;
+  return''}
+const DICT=[
+ [/\basync\b/,'async','非同期の印。この関数の中で await が使える','f9'],[/\bawait\b/,'await','結果が返るまで待つ','f9'],
+ [/\bfunction\b/,'function','関数を定義する（処理に名前を付ける）','f2'],[/=>/,'=>','アロー関数（短く書く関数）','k6'],
+ [/\bconst\b/,'const','あとで入れ替えない名前','k4'],[/\blet\b/,'let','入れ替えられる名前','k4'],[/\bvar\b/,'var','古い書き方の名前。const / let を使う','k4'],
+ [/\breturn\b/,'return','値を呼び出し元へ返して終わる','f5'],[/\bthrow\b/,'throw','エラーを起こして止める','f5'],[/\btry\b/,'try','失敗するかもしれない処理を試す','f5'],[/\bcatch\b/,'catch','失敗した時の受け皿','f5'],
+ [/\bif\b/,'if','条件が合う時だけ実行','f6'],[/\belse\b/,'else','それ以外の時','f6'],[/\bfor\b|\bwhile\b/,'for / while','繰り返す','f7'],
+ [/\bnew\b/,'new','新しく作る','f2'],
+ [/\bfetch\s*\(/,'fetch(…)','HTTP通信。ネットワークの先に問い合わせる','n4'],[/\.json\s*\(\)/,'.json()','返事の本文を JSON（データ）として読む','n5'],[/\.ok\b/,'.ok','通信が成功したか（true / false）','n5'],[/\.status\b/,'.status','返事の番号（200・404 など）','n6'],
+ [/JSON\.(parse|stringify)/,'JSON.parse / stringify','文字 ⇄ データの変換','n9'],[/localStorage/,'localStorage','端末に保存する小さな箱','d1'],[/indexedDB/,'indexedDB','端末の大きな保存場所','d3'],
+ [/\?\./,'?.','無いかもしれない値を安全にたどる','k8'],[/\?\?/,'??','無い時だけ別の値を使う','k8'],[/===|!==/,'=== / !==','等しいか／等しくないか','k5'],[/&&|\|\|/,'&& / ||','かつ／または','k12'],[/\.\.\./,'...','中身を広げる／まとめる','k11'],[/\$\{/,'${ }','文字に値を埋め込む','k10'],
+ [/\.(map|filter|reduce|forEach)\s*\(/,'.map / .filter / .reduce / .forEach','配列の1つずつに処理する','f7'],[/addEventListener/,'addEventListener','ボタンなどの反応を登録する','f8'],
+ [/querySelector/,'querySelector','画面の部品を探す','m3h'],[/innerHTML|textContent/,'innerHTML / textContent','部品の中身を書き換える','m4h'],[/console\.log/,'console.log','画面の裏に表示（確認用）',''],
+ [/\bnavigator\.clipboard\b/,'navigator.clipboard','コピー','u2'],[/\bspeechSynthesis\b/,'speechSynthesis','読み上げ','v1'],
+ [/\$[\w:]+/,'$名前','PowerShell の変数','k14'],[/\|/,'|','出力を次へ渡す（パイプ）','k15'],[/Get-ChildItem/i,'Get-ChildItem','ファイル一覧を取る','p3'],[/Where-Object/i,'Where-Object','条件で絞る','k15'],[/ForEach-Object|\bforeach\b/i,'foreach','1つずつ繰り返す','p4'],
+ [/Write-Host/i,'Write-Host','画面に表示する',''],[/Set-Location/i,'Set-Location','フォルダを移動する','p1'],[/Copy-Item/i,'Copy-Item','ファイルをコピーする','p2'],[/New-Item/i,'New-Item','ファイルやフォルダを作る','p2'],
+ [/\bgit\s+\w+/i,'git …','git の操作','h2g'],[/\bgh\s+\w+/i,'gh …','GitHub のコマンド','h4g']];
+function explainLine(t){
+  const out=[];let m;
+  if((m=/function\s+([\w$-]+)\s*\(([^)]*)\)/.exec(t))){out.push({tok:m[1],mean:'関数の名前'});if(m[2].trim())out.push({tok:'('+m[2].trim()+')',mean:'引数（関数に渡す材料）'})}
+  if((m=/\b(?:const|let|var)\s+([\w$]+)/.exec(t)))out.push({tok:m[1],mean:'変数の名前'});
+  DICT.forEach(d=>{if(d[0].test(t))out.push({tok:d[1],mean:d[2],id:d[3]})});
+  const seen=new Set();return out.filter(x=>{const k=x.tok;if(seen.has(k))return false;seen.add(k);return true})}
+const R={src:'',res:null,sel:-1,gist:false,ln:0};
 const SAMPLE=`async function loadData(url) {
   try {
     const res = await fetch(url);
@@ -219,8 +307,8 @@ function rRead(){
   <div class="card"><textarea class="cd" id="rc" spellcheck="false" placeholder="ここにコードを貼る">${esc(R.src)}</textarea>
   <div class="row" style="margin-top:8px"><button id="rg">分解する</button><button class="g" id="rs">サンプル</button><button class="g" id="rx">消す</button></div></div><div id="rr"></div>`;
   $('#rc').oninput=e=>{R.src=e.target.value};
-  $('#rg').onclick=()=>{R.src=$('#rc').value;if(!R.src.trim()){toast('コードを貼ってください');return}R.res=parseCode(R.src);R.sel=-1;drawRead()};
-  $('#rs').onclick=()=>{R.src=SAMPLE;$('#rc').value=SAMPLE;R.res=parseCode(SAMPLE);R.sel=-1;drawRead()};
+  $('#rg').onclick=()=>{R.src=$('#rc').value;if(!R.src.trim()){toast('コードを貼ってください');return}R.res=parseCode(R.src);R.sel=-1;R.ln=0;drawRead()};
+  $('#rs').onclick=()=>{R.src=SAMPLE;$('#rc').value=SAMPLE;R.res=parseCode(SAMPLE);R.sel=-1;R.ln=0;drawRead()};
   $('#rx').onclick=()=>{R.src='';R.res=null;R.sel=-1;$('#rc').value='';drawRead()};
   $('#app').onclick=e=>{const g=e.target.closest('[data-go]');if(g)goCard(g.dataset.go)};
   drawRead()}
@@ -236,8 +324,15 @@ function drawRead(){
   if(r.feats.length)h+=`<div class="card"><b>使っている仕組み</b><div class="row" style="margin-top:8px">${r.feats.map(f=>`<button class="chip" data-go="${esc(f.id)}">${esc(f.t)}</button>`).join('')}</div><div class="note">押すと、そのカードに飛びます</div></div>`;
   h+=`<div class="card"><b>構造（押すと範囲が光ります）</b><div style="margin-top:6px">${b.length?b.map((x,i)=>`<button class="tr ${i===R.sel?'on':''}" data-i="${i}" style="padding-left:${6+Math.min(x.depth,6)*14}px"><span class="kd">${esc(x.kind)}</span><span>${esc(x.name||'')}</span><span class="rg">行${x.start}〜${x.end}</span></button>`).join(''):'<div class="note">{ } で囲まれた範囲が見つかりません</div>'}</div>`;
   if(sel)h+=`<div class="ask"><b>${esc(sel.kind)}：行${sel.start} の <code>{</code> で始まり、行${sel.end} の <code>}</code> で終わる（${sel.end-sel.start+1}行）</b>${esc(KIND_INFO[sel.kind]||'')}</div>`;
-  h+=`</div><div class="cv" id="cv">${lines.map((t,i)=>{const n=i+1,c=sel?(n===sel.start?'st':n===sel.end?'en':(n>sel.start&&n<sel.end?'in':'')):'';return `<div class="cl ${c}" data-n="${n}"><i>${n}</i><span>${esc(t)||' '}</span></div>`}).join('')}</div>`;
+  h+=`</div><div class="card"><b>コードの色分け</b><div class="note"><b class="tk">キーワード</b> ／ <b class="tf">関数の呼び出し</b> ／ <b class="ts">文字</b> ／ <b class="tn">数</b> ／ <b class="tv">$変数</b> ／ <b class="tc">コメント</b>。行を押すと、その行を分解します。</div><label class="chk" style="margin-top:8px"><input type="checkbox" id="rgst" ${R.gist?'checked':''}><span>行ごとの解説を、コードの下に表示する</span></label><div id="lnp"></div></div><div class="cv" id="cv">${(()=>{let off=0;return lines.map((t,i)=>{const n=i+1,c=sel?(n===sel.start?'st':n===sel.end?'en':(n>sel.start&&n<sel.end?'in':'')):'';const g=R.gist?lineGist(t,n,b,r.ps):'';const o=off;off+=t.length+1;return `<div class="cl ${c} ${R.ln===n?'sel':''}" data-n="${n}"><i>${n}</i><span><div>${hlLine(t,r.cls,o,r.ps)}</div>${g?`<div class="gs">→ ${esc(g)}</div>`:''}</span></div>`}).join('')})()}</div>`;
   el.innerHTML=h;
+  const showLn=n=>{R.ln=n;el.querySelectorAll('.cl.sel').forEach(x=>x.classList.remove('sel'));const row=el.querySelector('.cl[data-n="'+n+'"]');if(row)row.classList.add('sel');
+    const t=lines[n-1]||'',ex=explainLine(t),gs=lineGist(t,n,b,r.ps);
+    $('#lnp').innerHTML=`<div class="ask" style="margin-top:10px"><b>行${n}</b><code style="white-space:pre-wrap;word-break:break-all">${esc(t.trim()||'(空の行)')}</code>${gs?`<div style="margin-top:6px">→ ${esc(gs)}</div>`:''}</div>`+(ex.length?`<dl class="fl">${ex.map(x=>`<dt>${esc(x.tok)}</dt><dd>${esc(x.mean)}${x.id&&byId(x.id)?` <button class="chip" data-go="${esc(x.id)}">${esc(byId(x.id).t)}</button>`:''}</dd>`).join('')}</dl>`:'<div class="note">この行は、特別な仕組みを使っていない行です。</div>');
+    $('#lnp').querySelectorAll('[data-go]').forEach(x=>x.onclick=()=>goCard(x.dataset.go))};
+  $('#cv').onclick=e=>{const row=e.target.closest('.cl');if(row)showLn(+row.dataset.n)};
+  $('#rgst').onchange=e=>{R.gist=e.target.checked;const y=scrollY;drawRead();scrollTo(0,y)};
+  if(R.ln)showLn(R.ln);
   el.querySelectorAll('[data-i]').forEach(x=>x.onclick=()=>{R.sel=R.sel===+x.dataset.i?-1:+x.dataset.i;drawRead();const s=$('#cv .st');if(s)s.scrollIntoView({block:'nearest'})});
   el.querySelectorAll('[data-go]').forEach(x=>x.onclick=()=>goCard(x.dataset.go))}
 
