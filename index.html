@@ -27,6 +27,13 @@ h1{font-size:20px;margin:4px 0 2px}h2{font-size:16px;margin:16px 0 6px}
 h2{font-size:15px;margin:16px 0 4px}
 .one{font-size:14.5px;font-weight:600;margin:8px 0 2px}
 .syn{display:flex;gap:14px;font-size:13px;margin:6px 0;color:var(--mu)}.syn code{background:#0a1017;border:1px solid var(--line);border-radius:6px;padding:1px 8px;font-size:15px;color:var(--tx)}
+textarea.cd{font-family:ui-monospace,Menlo,monospace;font-size:13px;min-height:150px;white-space:pre;overflow:auto}
+.cv{background:#0a1017;border:1px solid var(--line);border-radius:10px;overflow:auto;font:12px/1.55 ui-monospace,Menlo,monospace;margin:8px 0;max-height:60vh}
+.cl{display:flex;white-space:pre}.cl i{flex:0 0 38px;text-align:right;padding-right:8px;color:#5f7184;font-style:normal;user-select:none}.cl span{padding-right:12px}
+.cl.in{background:#1a2b3c}.cl.st{background:#23405a;box-shadow:inset 3px 0 0 var(--ac)}.cl.en{background:#23405a;box-shadow:inset 3px 0 0 #ff7a7a}
+.tr{display:flex;gap:6px;align-items:baseline;width:100%;text-align:left;background:transparent;color:var(--tx);border:0;border-radius:8px;padding:6px 6px;min-height:36px;font-weight:500;font-size:13.5px}
+.tr.on{background:#1a2b3c}.tr .kd{flex:0 0 auto;font-size:11px;padding:0 7px;border-radius:99px;border:1px solid var(--line);color:var(--mu)}
+.tr .rg{color:var(--mu);font-size:12px;flex:0 0 auto}.flow{display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin:6px 0}.flow span.ar{color:var(--mu)}
 dl.fl{margin:8px 0}dl.fl dt{font-size:12px;color:var(--ac);font-weight:700;margin-top:8px}dl.fl dd{margin:2px 0 0}dl.fl ul{margin:2px 0 2px 18px}
 .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 button{font:inherit;background:var(--ac);color:#241a00;border:0;border-radius:10px;padding:9px 13px;font-weight:700;min-height:44px}
@@ -43,7 +50,7 @@ pre{background:#0a1017;border:1px solid var(--line);border-radius:10px;padding:1
 .ask b{color:var(--bl);font-size:12px;display:block}
 .note{color:var(--mu);font-size:12.5px;margin:4px 0}
 .nav{position:fixed;left:0;right:0;bottom:0;display:flex;background:#0c131bee;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-top:1px solid var(--line);padding:6px 6px calc(6px + env(safe-area-inset-bottom));z-index:5}
-.nav button{flex:1;background:transparent;color:var(--mu);font-size:11px;font-weight:600;padding:5px 2px;min-height:48px;border-radius:8px;position:relative}
+.nav button{flex:1;min-width:0;background:transparent;color:var(--mu);font-size:11px;font-weight:600;padding:5px 2px;min-height:48px;border-radius:8px;position:relative}
 .nav button b{display:block;font-size:20px;line-height:1.1}.nav button.on{color:var(--ac)}
 .badge{position:absolute;top:2px;left:calc(50% + 6px);background:var(--ng);color:#fff;border-radius:99px;font-size:10px;min-width:17px;height:17px;line-height:17px;padding:0 4px}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom));background:#e8eef6;color:#0f1720;padding:8px 16px;border-radius:99px;font-size:13px;font-weight:600;z-index:9;opacity:0;pointer-events:none;transition:opacity .2s}
@@ -81,10 +88,10 @@ const doCopy=async t=>toast((await copy(t))?'コピーしました':'コピー�
 
 // ---------- 状態 ----------
 let tab='map',q='',dom='all',openId=null;
-const TABS=[['map','🗺','地図'],['find','🔎','探す'],['build','🧩','組む'],['apps','📱','アプリ'],['mine','➕','自分']];
+const TABS=[['map','🗺','地図'],['read','🧠','理解'],['find','🔎','探す'],['build','🧩','組む'],['apps','📱','アプリ'],['mine','➕','自分']];
 function nav(){$('#nav').innerHTML=TABS.map(t=>`<button data-t="${t[0]}" class="${tab===t[0]?'on':''}"><b>${t[1]}</b>${t[2]}${t[0]==='build'&&S.cart.length?`<span class="badge">${S.cart.length}</span>`:''}</button>`).join('');
   $('#nav').querySelectorAll('button').forEach(b=>b.onclick=()=>{tab=b.dataset.t;render();scrollTo(0,0)})}
-function render(){nav();({map:rMap,find:rFind,apps:rApps,build:rBuild,mine:rMine})[tab]()}
+function render(){nav();({map:rMap,read:rRead,find:rFind,apps:rApps,build:rBuild,mine:rMine})[tab]()}
 
 // ---------- 探す ----------
 function hit(c){
@@ -129,12 +136,117 @@ function drawList(){
     else if(a==='star'){S.star[id]=!S.star[id];if(!S.star[id])delete S.star[id];save();drawList()}
     else if(a==='cart'){const i=S.cart.indexOf(id);if(i<0){S.cart.push(id);toast('組む に入れました')}else S.cart.splice(i,1);save();nav();drawList()}}}
 
+// ---------- 理解（コードの構造を見る） ----------
+// parseCode(src) → {blocks:[{kind,name,start,end,depth,head}], errs:[], lines:n}  ※画面側は構造だけを見る。後で本物のパーサに差し替え可
+const KIND_INFO={'関数':'処理に名前を付けて登録する。呼ばれるまで動かない','アロー関数':'短く書く関数（=>）。引数として渡されることが多い','クラス':'同じ形のもの（データ＋動き）を作る設計図','条件':'条件が成り立つ時だけ中を実行する','繰り返し':'中の処理を何度も繰り返す','分岐':'値によって行き先を切り替える','失敗に備える':'try の中で失敗したら catch に移る（落ちないための受け皿）','メソッド':'オブジェクトやクラスに属する関数','データ':'項目のまとまり（オブジェクト）','ブロック':'処理のまとまり'};
+const FEAT=[
+ [/\bawait\b|\basync\b/,'待つ（async/await）','f9'],[/\bfetch\s*\(/,'通信（fetch）','a1'],[/\blocalStorage\b/,'端末に保存（localStorage）','d1'],[/\bindexedDB\b/,'大きく保存（IndexedDB）','d3'],
+ [/JSON\.(parse|stringify)/,'JSONの変換','a2'],[/addEventListener|\bonclick\b|\.onclick|\.oninput/,'ボタンなどの反応（イベント）','f8'],[/\btry\b/,'失敗の受け皿（try/catch）','f5'],
+ [/\.(filter|map|reduce)\s*\(/,'配列の絞り込み・変換','f7'],[/\?\.|\?\?/,'無い値を安全に扱う（?. ??）','k8'],[/=>/,'アロー関数（=>）','k6'],[/\$\{/,'文字に値を埋め込む（${ }）','k10'],
+ [/\bnavigator\.clipboard\b/,'コピー','u2'],[/\bspeechSynthesis\b/,'読み上げ','v1'],[/\$env:|Get-ChildItem|Set-Location|\bgit\s/,'PowerShell・git の操作','p1']];
+function parseCode(src){
+  let L=String(src).replace(/\r\n?/g,'\n');
+  if(/<script[\s>]/i.test(L)){const o=[];let pos=0;const rx=/<script[^>]*>([\s\S]*?)<\/script>/gi;let m;
+    while((m=rx.exec(L))){const a=m.index+m[0].indexOf('>')+1;o.push(L.slice(pos,a).replace(/[^\n]/g,' '),m[1]);pos=a+m[1].length}
+    o.push(L.slice(pos).replace(/[^\n]/g,' '));L=o.join('')}
+  const n=L.length,ps=!/\bconst\b|\blet\b|=>/.test(L)&&/(^|\n)\s*(function\s+[\w-]+\s*\{|\$\w+\s*=|param\s*\()/.test(L);
+  const clean=L.split('');let i=0,line=1,hs=0,pd=0,ph='';const st=[],blocks=[],errs=[];
+  const blank=(a,b)=>{for(let k=a;k<b;k++)if(clean[k]!=='\n')clean[k]=' '};
+  const skipBr=(k)=>{let d=1;k+=2;while(k<n&&d>0){if(L[k]==='{')d++;else if(L[k]==='}')d--;else if(L[k]==='\n')line++;k++}return k};
+  while(i<n){const c=L[i],d=L[i+1];
+    if(c==='\n'){line++;if(ps&&pd===0){const t=clean.slice(hs,i).join('').trim();if(t)ph=t;hs=i+1}i++;continue}
+    if((c==='/'&&d==='/')||(ps&&c==='#')){const e=L.indexOf('\n',i);const j=e<0?n:e;blank(i,j);i=j;continue}
+    if(c==='/'&&d==='*'||(ps&&c==='<'&&d==='#')){const cl=ps&&c==='<'?'#>':'*/';let e=L.indexOf(cl,i+2);e=e<0?n:e+2;for(let k=i;k<e;k++)if(L[k]==='\n')line++;blank(i,e);i=e;continue}
+    if(c==='"'||c==="'"||c==='`'){let k=i+1;
+      while(k<n){const x=L[k];
+        if(x==='\n'){line++;if(c!=='`'&&!ps&&L[k-1]!=='\\')break}
+        if(c==='`'&&!ps&&x==='$'&&L[k+1]==='{'){k=skipBr(k)-1}
+        else if(!ps&&x==='\\'){k++}
+        else if(ps&&x==='`'&&c==='"'){k++}
+        else if(x===c){if(ps&&L[k+1]===c){k++}else break}
+        k++}
+      blank(i+1,Math.min(k,n));i=Math.min(k,n)+1;continue}
+    if(c==='('){pd++}else if(c===')'){pd=Math.max(0,pd-1)}
+    else if(c===';'&&pd===0){hs=i+1;ph=''}
+    else if(c==='{'){{let hd=clean.slice(hs,i).join('');if(ps&&!hd.trim()&&ph)hd=ph;st.push({line,idx:i,head:hd,depth:st.length});ph='';hs=i+1}}
+    else if(c==='}'){const t=st.pop();if(!t){errs.push('行'+line+'：閉じる } に対応する { がありません')}else{blocks.push(Object.assign(classify(t.head,ps),{start:t.line,end:line,depth:t.depth,head:t.head.replace(/\s+/g,' ').trim()}))}hs=i+1;pd=0}
+    i++}
+  st.forEach(t=>errs.push('行'+t.line+'：開いた { が閉じられていません'));
+  blocks.sort((a,b)=>a.start-b.start||b.end-a.end);
+  const feats=FEAT.filter(f=>f[0].test(clean.join(''))).map(f=>({t:f[1],id:f[2]}));
+  return{blocks,errs,lines:L.split('\n').length,feats}}
+function classify(head,ps){
+  const h=head.replace(/\s+/g,' ').trim(); let m;
+  if((m=/(?:^|[\s=:(,])function\b\s*\*?\s*([\w$-]*)/.exec(h)))return{kind:'関数',name:m[1]||'（名前なし）'};
+  if((m=/\bclass\s+([\w$]+)/.exec(h)))return{kind:'クラス',name:m[1]};
+  if(/=>\s*$/.test(h)){let nm='';if((m=/(?:const|let|var)\s+([\w$]+)\s*=/.exec(h)))nm=m[1];else if((m=/([\w$]+)\s*[:=]\s*(?:async\s*)?(?:\(|[\w$]+\s*=>)/.exec(h)))nm=m[1];else if((m=/([\w$.]+)\s*\([^()]*$/.exec(h)))nm=m[1]+' に渡す';return{kind:'アロー関数',name:nm||'（名前なし）'}}
+  if(/^(else\s+if|elseif|if)\b/i.test(h))return{kind:'条件',name:h.replace(/^(else\s+if|elseif|if)\s*/i,'$&').slice(0,40)};
+  if(/^else\b/i.test(h))return{kind:'条件',name:'それ以外'};
+  if(/Where-Object/i.test(h))return{kind:'条件',name:'Where-Object（絞る）'};
+  if(/ForEach-Object/i.test(h))return{kind:'繰り返し',name:'ForEach-Object'};
+  if(/^(for|foreach|while|do)\b/i.test(h))return{kind:'繰り返し',name:h.slice(0,40)};
+  if(/^switch\b/i.test(h))return{kind:'分岐',name:h.slice(0,40)};
+  if(/^(try|catch|finally)\b/i.test(h))return{kind:'失敗に備える',name:h.split(/[\s(]/)[0]};
+  if((m=/^(?:async\s+)?([\w$]+)\s*\([^()]*\)$/.exec(h))&&!/^(if|for|while|switch|catch|function|return)$/.test(m[1]))return{kind:'メソッド',name:m[1]};
+  if(/(=|:|\(|,|@|\breturn|\[)\s*$/.test(h)||h==='')return{kind:'データ',name:h?h.replace(/[=:(,\[]\s*$/,'').trim().slice(0,30):''};
+  return{kind:'ブロック',name:h.slice(0,30)}}
+const R={src:'',res:null,sel:-1};
+const SAMPLE=`async function loadData(url) {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) {
+      throw new Error("失敗 " + res.status);
+    }
+    const data = await res.json();
+    return data;
+  } catch (e) {
+    console.log(e);
+    return [];
+  }
+}
+
+const list = ["a", "b", "c"];
+list.forEach(x => {
+  console.log(x);
+});
+for (let i = 0; i < 3; i++) {
+  save({ id: i });
+}`;
+function rRead(){
+  const ST=[['関数','f1'],['変数','k4'],['条件','k5'],['繰り返し','f7'],['通信','a1'],['保存','d1']];
+  $('#app').innerHTML=`<h1>🧠 理解する</h1><p class="sub">コードを貼ると、「どこから始まり、どこで終わるか」「何の仕組みを使っているか」を見せます。JavaScript・PowerShell・HTML（中の script）に対応。端末内だけで処理し、保存も送信もしません。</p>
+  <div class="card"><b>コードの見取り図</b><div class="flow">${ST.map((x,i)=>(i?'<span class="ar">→</span>':'')+`<button class="chip" data-go="${x[1]}">${x[0]}</button>`).join('')}</div><div class="note">関数を組み立て、名前を付け、条件で分け、繰り返し、外と通信し、保存する。アプリの動きはこの順に積み上がります。</div></div>
+  <div class="card"><textarea class="cd" id="rc" spellcheck="false" placeholder="ここにコードを貼る">${esc(R.src)}</textarea>
+  <div class="row" style="margin-top:8px"><button id="rg">分解する</button><button class="g" id="rs">サンプル</button><button class="g" id="rx">消す</button></div></div><div id="rr"></div>`;
+  $('#rc').oninput=e=>{R.src=e.target.value};
+  $('#rg').onclick=()=>{R.src=$('#rc').value;if(!R.src.trim()){toast('コードを貼ってください');return}R.res=parseCode(R.src);R.sel=-1;drawRead()};
+  $('#rs').onclick=()=>{R.src=SAMPLE;$('#rc').value=SAMPLE;R.res=parseCode(SAMPLE);R.sel=-1;drawRead()};
+  $('#rx').onclick=()=>{R.src='';R.res=null;R.sel=-1;$('#rc').value='';drawRead()};
+  $('#app').onclick=e=>{const g=e.target.closest('[data-go]');if(g)goCard(g.dataset.go)};
+  drawRead()}
+function drawRead(){
+  const el=$('#rr');if(!R.res){el.innerHTML='';return}
+  const r=R.res,b=r.blocks,sel=b[R.sel],cnt=k=>b.filter(x=>x.kind===k||(k==='関数'&&x.kind==='アロー関数')).length;
+  const lines=R.src.replace(/\r\n?/g,'\n').split('\n');
+  const sum=`${r.lines}行 ／ 関数 ${cnt('関数')} ／ 条件 ${cnt('条件')} ／ 繰り返し ${cnt('繰り返し')} ／ { } の組 ${b.length}`;
+  let h=`<div class="card"><b>結果</b><div class="note">${esc(sum)}</div>`;
+  if(r.errs.length)h+=`<div class="note" style="color:var(--ng)">⚠ ${r.errs.map(esc).join('<br>⚠ ')}<br>（正規表現や特殊な書き方があると、うまく読めないことがあります）</div>`;
+  else h+=`<div class="note" style="color:var(--ok)">✓ { と } の数は合っています</div>`;
+  h+=`</div>`;
+  if(r.feats.length)h+=`<div class="card"><b>使っている仕組み</b><div class="row" style="margin-top:8px">${r.feats.map(f=>`<button class="chip" data-go="${esc(f.id)}">${esc(f.t)}</button>`).join('')}</div><div class="note">押すと、そのカードに飛びます</div></div>`;
+  h+=`<div class="card"><b>構造（押すと範囲が光ります）</b><div style="margin-top:6px">${b.length?b.map((x,i)=>`<button class="tr ${i===R.sel?'on':''}" data-i="${i}" style="padding-left:${6+Math.min(x.depth,6)*14}px"><span class="kd">${esc(x.kind)}</span><span>${esc(x.name||'')}</span><span class="rg">行${x.start}〜${x.end}</span></button>`).join(''):'<div class="note">{ } で囲まれた範囲が見つかりません</div>'}</div>`;
+  if(sel)h+=`<div class="ask"><b>${esc(sel.kind)}：行${sel.start} の <code>{</code> で始まり、行${sel.end} の <code>}</code> で終わる（${sel.end-sel.start+1}行）</b>${esc(KIND_INFO[sel.kind]||'')}</div>`;
+  h+=`</div><div class="cv" id="cv">${lines.map((t,i)=>{const n=i+1,c=sel?(n===sel.start?'st':n===sel.end?'en':(n>sel.start&&n<sel.end?'in':'')):'';return `<div class="cl ${c}" data-n="${n}"><i>${n}</i><span>${esc(t)||' '}</span></div>`}).join('')}</div>`;
+  el.innerHTML=h;
+  el.querySelectorAll('[data-i]').forEach(x=>x.onclick=()=>{R.sel=R.sel===+x.dataset.i?-1:+x.dataset.i;drawRead();const s=$('#cv .st');if(s)s.scrollIntoView({block:'nearest'})});
+  el.querySelectorAll('[data-go]').forEach(x=>x.onclick=()=>goCard(x.dataset.go))}
+
 // ---------- 地図 ----------
 function rMap(){
   const cnt=k=>CARDS.filter(c=>c.dom===k).length;
   $('#app').innerHTML=`<h1>🗺 地図</h1><p class="sub">アプリは「画面・処理・データ・保存・外との通信・公開」でできています。迷ったら、ここから入ってください。</p>
   <div class="card"><b>① 困った時</b><div class="row" style="margin-top:8px"><button class="chip" data-dom="fail">失敗例（${cnt('fail')}）</button><button class="chip" data-go="w7">症状から探す</button><button class="chip" data-go="w5">迷子の確認コマンド</button></div></div>
-  <div class="card"><b>② 読む・知る</b><div class="row" style="margin-top:8px"><button class="chip" data-dom="sym">記号（${cnt('sym')}）</button><button class="chip" data-dom="file">ファイルの役割（${cnt('file')}）</button><button class="chip" data-dom="html">HTMLの読み方</button><button class="chip" data-dom="fn">関数を制する</button></div></div>
+  <div class="card"><b>② 読む・知る</b><div class="note">コードを貼ると、どこからどこまでが関数・条件・繰り返しかを見せます →「🧠 理解」</div><div class="row" style="margin-top:8px"><button class="chip" data-dom="sym">記号（${cnt('sym')}）</button><button class="chip" data-dom="file">ファイルの役割（${cnt('file')}）</button><button class="chip" data-dom="html">HTMLの読み方</button><button class="chip" data-dom="fn">関数を制する</button></div></div>
   <h2>③ アプリの部品</h2>`+MAPD.map(g=>`<div class="card"><b>${g[0]} ${esc(g[1])}</b><div class="row" style="margin-top:8px">${g[2].map(x=>`<button class="chip" data-go="${esc(x[1])}">${esc(x[0])}</button>`).join('')}</div></div>`).join('')
   +`<h2>④ 6段のはしご（下から順に）</h2><div class="card">`+LADDER.slice().reverse().map(l=>`<div style="margin:6px 0"><span class="tag lv">L${l[0]}</span><b style="font-size:14px">${esc(l[1])}</b><div class="row" style="margin-top:4px">${l[2].map(i=>{const c=byId(i);return c?`<button class="chip" data-go="${esc(i)}">${esc(c.t)}</button>`:''}).join('')}</div></div>`).join('')+`</div>
   <div class="card"><b>⑤ 自分のアプリから見る</b><div class="note">どのアプリが何を使っているかは「📱 アプリ」へ。</div><div class="row" style="margin-top:8px"><button class="chip" data-tab="apps">📱 アプリを開く</button></div></div>`;
